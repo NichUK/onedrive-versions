@@ -39,6 +39,7 @@ Use command palette:
 - `OneDrive: Open Setup Guide`
 
 If you see tenant auth error `AADSTS65002`, use `Switch Auth Mode` in the error prompt, then complete device-code setup.
+Background auto-load does not trigger interactive sign-in; sign-in prompts are shown when you explicitly run version/account commands.
 
 ## Settings
 

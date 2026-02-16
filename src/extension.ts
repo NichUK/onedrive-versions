@@ -37,6 +37,10 @@ interface Mapping {
   remoteRoot?: string;
 }
 
+interface RequestOptions {
+  interactive?: boolean;
+}
+
 class OneDriveClient {
   private readonly contextCache = new Map<string, VersionContext>();
   private msalApp?: PublicClientApplication;
@@ -64,7 +68,7 @@ class OneDriveClient {
     await cfg.update("auth.mode", mode, vscode.ConfigurationTarget.Global);
   }
 
-  public async loadVersionsForFile(localPath: string): Promise<VersionContext> {
+  public async loadVersionsForFile(localPath: string, options?: RequestOptions): Promise<VersionContext> {
     const resolved = path.resolve(localPath);
     const mapping = this.resolveBestMapping(resolved);
     if (!mapping) {
@@ -72,14 +76,14 @@ class OneDriveClient {
     }
 
     const remotePath = this.toRemotePath(mapping, resolved);
-    const item = await this.getDriveItem(mapping.driveId, remotePath);
+    const item = await this.getDriveItem(mapping.driveId, remotePath, options);
     const driveId = item.parentReference?.driveId ?? mapping.driveId;
 
     if (!driveId) {
       throw new Error("Unable to determine driveId for this file.");
     }
 
-    const versions = await this.getVersions(driveId, item.id);
+    const versions = await this.getVersions(driveId, item.id, options);
     const sorted = [...versions].sort((a, b) => {
       return new Date(b.lastModifiedDateTime).getTime() - new Date(a.lastModifiedDateTime).getTime();
     });
@@ -201,29 +205,30 @@ class OneDriveClient {
     return `/${joined}`;
   }
 
-  private async getDriveItem(driveId: string | undefined, remotePath: string): Promise<GraphDriveItem> {
+  private async getDriveItem(driveId: string | undefined, remotePath: string, options?: RequestOptions): Promise<GraphDriveItem> {
     const base = driveId ? `/drives/${encodeURIComponent(driveId)}` : "/me/drive";
     const endpoint = `${GRAPH_BASE}${base}/root:${remotePath}?$select=id,name,parentReference`;
-    return this.fetchJson<GraphDriveItem>(endpoint);
+    return this.fetchJson<GraphDriveItem>(endpoint, options);
   }
 
-  private async getVersions(driveId: string, itemId: string): Promise<GraphVersion[]> {
+  private async getVersions(driveId: string, itemId: string, options?: RequestOptions): Promise<GraphVersion[]> {
     const endpoint = `${GRAPH_BASE}/drives/${encodeURIComponent(driveId)}/items/${encodeURIComponent(itemId)}/versions?$select=id,lastModifiedDateTime,size,lastModifiedBy`;
-    const response = await this.fetchJson<{ value: GraphVersion[] }>(endpoint);
+    const response = await this.fetchJson<{ value: GraphVersion[] }>(endpoint, options);
     return response.value ?? [];
   }
 
-  private async getAccessToken(): Promise<string> {
+  private async getAccessToken(options?: RequestOptions): Promise<string> {
+    const interactive = options?.interactive ?? true;
     const authMode = this.getAuthMode();
     if (authMode === "deviceCode") {
-      return this.getAccessTokenViaDeviceCode();
+      return this.getAccessTokenViaDeviceCode({ interactive });
     }
 
     const scopes = ["Files.Read"];
     try {
-      const session = await vscode.authentication.getSession("microsoft", scopes, { createIfNone: true });
+      const session = await vscode.authentication.getSession("microsoft", scopes, { createIfNone: interactive });
       if (!session) {
-        throw new Error("Microsoft account authentication is required.");
+        throw new Error("AUTH_REQUIRED");
       }
       return session.accessToken;
     } catch (error) {
@@ -237,7 +242,8 @@ class OneDriveClient {
     }
   }
 
-  private async getAccessTokenViaDeviceCode(): Promise<string> {
+  private async getAccessTokenViaDeviceCode(options?: RequestOptions): Promise<string> {
+    const interactive = options?.interactive ?? true;
     const cfg = vscode.workspace.getConfiguration("onedriveVersions");
     const clientId = cfg.get<string>("auth.clientId", "").trim();
     const tenantId = cfg.get<string>("auth.tenantId", "organizations").trim() || "organizations";
@@ -276,24 +282,28 @@ class OneDriveClient {
       }
     }
 
-    const interactive = await this.msalApp.acquireTokenByDeviceCode({
+    if (!interactive) {
+      throw new Error("AUTH_REQUIRED");
+    }
+
+    const interactiveToken = await this.msalApp.acquireTokenByDeviceCode({
       scopes,
       deviceCodeCallback: (response) => {
         void vscode.window.showInformationMessage(response.message);
       }
     });
 
-    if (!interactive?.accessToken) {
+    if (!interactiveToken?.accessToken) {
       throw new Error("Device code sign-in did not return a Graph access token.");
     }
-    if (interactive.account?.homeAccountId) {
-      this.msalAccountHomeId = interactive.account.homeAccountId;
+    if (interactiveToken.account?.homeAccountId) {
+      this.msalAccountHomeId = interactiveToken.account.homeAccountId;
     }
-    return interactive.accessToken;
+    return interactiveToken.accessToken;
   }
 
-  private async fetchJson<T>(url: string): Promise<T> {
-    const token = await this.getAccessToken();
+  private async fetchJson<T>(url: string, options?: RequestOptions): Promise<T> {
+    const token = await this.getAccessToken(options);
     const response = await fetch(url, {
       headers: {
         Authorization: `Bearer ${token}`
@@ -306,8 +316,8 @@ class OneDriveClient {
     return (await response.json()) as T;
   }
 
-  private async fetchBinary(url: string): Promise<Uint8Array> {
-    const token = await this.getAccessToken();
+  private async fetchBinary(url: string, options?: RequestOptions): Promise<Uint8Array> {
+    const token = await this.getAccessToken(options);
     const response = await fetch(url, {
       headers: {
         Authorization: `Bearer ${token}`
@@ -436,10 +446,14 @@ export function activate(context: vscode.ExtensionContext): void {
     const autoLoad = vscode.workspace.getConfiguration("onedriveVersions").get<boolean>("autoLoadVersions", true);
     if (autoLoad && !cached) {
       try {
-        await client.loadVersionsForFile(localPath);
+        await client.loadVersionsForFile(localPath, { interactive: false });
         await vscode.commands.executeCommand("setContext", "oneDriveVersions.hasVersions", true);
       } catch (error) {
         const msg = error instanceof Error ? error.message : String(error);
+        if (msg === "AUTH_REQUIRED") {
+          await vscode.commands.executeCommand("setContext", "oneDriveVersions.hasVersions", false);
+          return;
+        }
         if (!msg.includes("inside a detected OneDrive root")) {
           await handleOneDriveError(error);
         }

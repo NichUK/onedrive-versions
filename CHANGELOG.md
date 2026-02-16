@@ -14,3 +14,4 @@
   - `OneDrive: Connect Microsoft Account`
   - `OneDrive: Open Setup Guide`
   - one-click switch to device-code mode on `AADSTS65002`
+- Changed auto-load behavior to silent auth checks (no interactive sign-in prompt until user runs a version/auth command).

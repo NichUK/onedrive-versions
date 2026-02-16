@@ -29,6 +29,7 @@
 - Onboarding UX implemented:
   - First-run prompt when device-code mode has no `clientId`
   - Actionable auth-error prompts (switch auth mode, open settings, open setup guide)
+  - Background auto-load uses non-interactive auth checks to avoid surprise sign-in prompts
 - Content preview provider:
   - Scheme: `onedrive-version`
   - Decodes fetched bytes as UTF-8 text
