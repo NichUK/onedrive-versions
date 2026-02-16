@@ -22,9 +22,9 @@ This extension adds OneDrive version navigation for files opened from OneDrive-s
 
 ## Authentication Modes
 
-- `onedriveVersions.auth.mode = "vscode"` (default)
+- `onedriveVersions.auth.mode = "vscode"`
   - Uses VS Code Microsoft authentication provider.
-- `onedriveVersions.auth.mode = "deviceCode"`
+- `onedriveVersions.auth.mode = "deviceCode"` (production default)
   - Uses MSAL device-code sign-in with your own Entra app registration.
   - Required settings:
     - `onedriveVersions.auth.clientId`
@@ -71,13 +71,15 @@ Device-code auth example:
 "onedriveVersions.auth.tenantId": "contoso.onmicrosoft.com"
 ```
 
-Recommended production defaults:
+Recommended production defaults (already shipped in this repo):
 
 ```json
 "onedriveVersions.auth.mode": "deviceCode",
-"onedriveVersions.auth.clientId": "<your-shipped-entra-app-client-id>",
+"onedriveVersions.auth.clientId": "6bb315fa-774e-4147-8e0c-2afd44ffb86e",
 "onedriveVersions.auth.tenantId": "organizations"
 ```
+
+For external tenants, first run may still require tenant admin consent to this app's `Files.Read` permission.
 
 ## Notes
 

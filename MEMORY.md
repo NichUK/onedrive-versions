@@ -30,6 +30,10 @@
   - First-run prompt when device-code mode has no `clientId`
   - Actionable auth-error prompts (switch auth mode, open settings, open setup guide)
   - Background auto-load uses non-interactive auth checks to avoid surprise sign-in prompts
+- Production defaults now ship with:
+  - `onedriveVersions.auth.mode = deviceCode`
+  - `onedriveVersions.auth.clientId = 6bb315fa-774e-4147-8e0c-2afd44ffb86e`
+  - `onedriveVersions.auth.tenantId = organizations`
 - Content preview provider:
   - Scheme: `onedrive-version`
   - Decodes fetched bytes as UTF-8 text

@@ -85,12 +85,6 @@
           "command": "onedriveVersions.pickVersion"
         },
         {
-          "command": "onedriveVersions.connectAccount"
-        },
-        {
-          "command": "onedriveVersions.openSetupGuide"
-        },
-        {
           "command": "onedriveVersions.saveAsVersion",
           "when": "oneDriveVersions.hasVersions"
         },
@@ -135,13 +129,13 @@
             "vscode",
             "deviceCode"
           ],
-          "default": "vscode",
-          "description": "Authentication mode for Microsoft Graph. Use 'deviceCode' when tenant policy blocks VS Code Microsoft auth."
+          "default": "deviceCode",
+          "description": "Authentication mode for Microsoft Graph."
         },
         "onedriveVersions.auth.clientId": {
           "type": "string",
-          "default": "",
-          "description": "Entra app registration client ID for device code auth mode."
+          "default": "6bb315fa-774e-4147-8e0c-2afd44ffb86e",
+          "description": "Entra app registration client ID for device code auth mode. Defaults to the production app."
         },
         "onedriveVersions.auth.tenantId": {
           "type": "string",
