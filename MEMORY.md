@@ -26,6 +26,10 @@
   - Scheme: `onedrive-version`
   - Decodes fetched bytes as UTF-8 text
   - Shows placeholder text for likely binary content
+- Local git repo is initialized with first commit on `main`.
+- Remote configured:
+  - `origin = https://github.com/NichUK/onedrive-versions.git`
+- Push attempt failed because GitHub repository does not yet exist.
 
 ## Files of Interest
 - `src/extension.ts`: core extension logic
@@ -39,7 +43,7 @@
 - No automated tests yet.
 - Binary version preview is text fallback only (not binary-aware diff/view).
 - Restore currently writes local file bytes; cloud “restore” is achieved via sync upload rather than a dedicated Graph restore endpoint action.
-- Repo was not yet initialized/published before this memory snapshot.
+- GitHub repo creation/publish is blocked until repo exists or authenticated GitHub API/CLI access is available.
 
 ## Resume Checklist
 1. Run `npm run compile` to verify baseline.
