@@ -95,7 +95,8 @@ class OneDriveClient {
   private resolveBestMapping(localPath: string): Mapping | undefined {
     const configured = this.getMappingsFromConfig();
     const envMappings = this.getMappingsFromEnvironment();
-    const candidates = [...configured, ...envMappings];
+    const inferred = this.inferMappingFromPath(localPath);
+    const candidates = inferred ? [...configured, ...envMappings, inferred] : [...configured, ...envMappings];
 
     const matches = candidates
       .map((m) => ({ m, root: normalizeLocalRoot(m.localRoot) }))
@@ -110,6 +111,23 @@ class OneDriveClient {
       ...matches[0].m,
       localRoot: matches[0].root
     };
+  }
+
+  private inferMappingFromPath(localPath: string): Mapping | undefined {
+    const parsed = path.parse(localPath);
+    const segments = localPath
+      .slice(parsed.root.length)
+      .split(path.sep)
+      .filter((segment) => segment.length > 0);
+
+    const oneDriveIndex = segments.findIndex((segment) => /^onedrive(\b|[ -])/i.test(segment));
+    if (oneDriveIndex < 0) {
+      return undefined;
+    }
+
+    const rootSegments = segments.slice(0, oneDriveIndex + 1);
+    const inferredRoot = path.join(parsed.root, ...rootSegments);
+    return { localRoot: inferredRoot };
   }
 
   private getMappingsFromConfig(): Mapping[] {

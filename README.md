@@ -47,3 +47,4 @@ Example:
 
 - Preview works best for text files. Binary versions will show a placeholder message in the preview tab.
 - `Restore Selected Version` writes bytes to the local file. OneDrive sync then uploads it as the current cloud version.
+- If OneDrive environment variables are unavailable, the extension also tries to infer a local OneDrive root from folder names like `OneDrive` or `OneDrive - <Org>`.

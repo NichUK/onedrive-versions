@@ -19,6 +19,7 @@
 - OneDrive detection sources:
   - User settings mappings: `onedriveVersions.mappings`
   - Environment: `OneDrive`, `OneDriveCommercial`, `OneDriveConsumer`
+  - Fallback path inference from local folder segment names matching `OneDrive` / `OneDrive - <Org>`
 - Graph auth uses VS Code Microsoft auth provider with scopes:
   - `User.Read`
   - `Files.ReadWrite.All`
