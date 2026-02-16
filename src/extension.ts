@@ -189,7 +189,7 @@ class OneDriveClient {
   }
 
   private async getAccessToken(): Promise<string> {
-    const scopes = ["User.Read", "Files.ReadWrite.All"];
+    const scopes = ["Files.Read"];
     const session = await vscode.authentication.getSession("microsoft", scopes, { createIfNone: true });
     if (!session) {
       throw new Error("Microsoft account authentication is required.");

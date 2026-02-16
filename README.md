@@ -18,8 +18,7 @@ This extension adds OneDrive version navigation for files opened from OneDrive-s
 - VS Code signed in to Microsoft account(s) used for OneDrive.
 - OneDrive-synced files available locally.
 - Consent to Microsoft Graph scopes used by this extension:
-  - `User.Read`
-  - `Files.ReadWrite.All`
+  - `Files.Read`
 
 ## Settings
 

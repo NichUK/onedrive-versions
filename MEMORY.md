@@ -21,8 +21,7 @@
   - Environment: `OneDrive`, `OneDriveCommercial`, `OneDriveConsumer`
   - Fallback path inference from local folder segment names matching `OneDrive` / `OneDrive - <Org>`
 - Graph auth uses VS Code Microsoft auth provider with scopes:
-  - `User.Read`
-  - `Files.ReadWrite.All`
+  - `Files.Read`
 - Content preview provider:
   - Scheme: `onedrive-version`
   - Decodes fetched bytes as UTF-8 text

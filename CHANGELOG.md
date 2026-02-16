@@ -8,3 +8,4 @@
 - Added editor-title dropdown menu with version actions.
 - Added preview, save-as, and restore workflows.
 - Added fallback local root inference for OneDrive folder names when env-based detection is unavailable.
+- Reduced Microsoft Graph delegated scope request to `Files.Read` to improve tenant compatibility.
