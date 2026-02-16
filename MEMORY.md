@@ -27,6 +27,7 @@
   - `Files.Read`
 - Additional auth mode available:
   - Device code via MSAL (`onedriveVersions.auth.mode = deviceCode`) using user-provided Entra app `clientId`
+  - Device-code flow now auto-opens verification URL and copies user code to clipboard
 - Onboarding UX implemented:
   - First-run prompt when device-code mode has no `clientId`
   - Actionable auth-error prompts (switch auth mode, open settings, open setup guide)

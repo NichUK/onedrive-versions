@@ -26,6 +26,7 @@ This extension adds OneDrive version navigation for files opened from OneDrive-s
   - Uses VS Code Microsoft authentication provider.
 - `onedriveVersions.auth.mode = "deviceCode"` (production default)
   - Uses MSAL device-code sign-in with your own Entra app registration.
+  - Automatically opens the verification URL in your browser and copies the device code to clipboard.
   - Required settings:
     - `onedriveVersions.auth.clientId`
     - Optional `onedriveVersions.auth.tenantId` (default `organizations`)

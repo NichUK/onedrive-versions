@@ -318,9 +318,23 @@ class OneDriveClient {
       throw new Error("AUTH_REQUIRED");
     }
 
+    let browserOpened = false;
     const interactiveToken = await this.msalApp.acquireTokenByDeviceCode({
       scopes,
       deviceCodeCallback: (response) => {
+        if (!browserOpened && response.verificationUri) {
+          browserOpened = true;
+          void vscode.env.openExternal(vscode.Uri.parse(response.verificationUri));
+        }
+
+        if (response.userCode) {
+          void vscode.env.clipboard.writeText(response.userCode);
+          void vscode.window.showInformationMessage(
+            `Device code copied to clipboard: ${response.userCode}. Complete sign-in in your browser.`
+          );
+          return;
+        }
+
         void vscode.window.showInformationMessage(response.message);
       }
     });
