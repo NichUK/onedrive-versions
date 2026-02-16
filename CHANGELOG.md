@@ -18,3 +18,4 @@
 - Set production auth defaults to device-code mode with built-in app client ID for lower-friction onboarding.
 - Improved OneDrive root detection on Windows by reading sync mount points from the OneDrive registry provider keys.
 - Device-code auth now auto-opens the verification URL and copies the device code to clipboard.
+- Added fallback drive resolution: if `/me/drive` path lookup returns `itemNotFound`, try matching path across `/me/drives`.

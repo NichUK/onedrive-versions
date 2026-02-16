@@ -23,6 +23,9 @@
   - Environment: `OneDrive`, `OneDriveCommercial`, `OneDriveConsumer`
   - Windows registry mount points from `HKCU\\Software\\SyncEngines\\Providers\\OneDrive` (`MountPoint`)
   - Fallback path inference from local folder segment names matching `OneDrive` / `OneDrive - <Org>`
+- Graph item resolution strategy:
+  - Try `/me/drive/root:{path}` first
+  - On `itemNotFound`, fallback to iterate `/me/drives` and resolve the same path in each drive
 - Graph auth uses VS Code Microsoft auth provider with scopes:
   - `Files.Read`
 - Additional auth mode available:

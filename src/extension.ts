@@ -25,6 +25,12 @@ interface GraphDriveItem {
   };
 }
 
+interface GraphDrive {
+  id: string;
+  name?: string;
+  driveType?: string;
+}
+
 interface VersionContext {
   driveId: string;
   itemId: string;
@@ -238,9 +244,37 @@ class OneDriveClient {
   }
 
   private async getDriveItem(driveId: string | undefined, remotePath: string, options?: RequestOptions): Promise<GraphDriveItem> {
-    const base = driveId ? `/drives/${encodeURIComponent(driveId)}` : "/me/drive";
-    const endpoint = `${GRAPH_BASE}${base}/root:${remotePath}?$select=id,name,parentReference`;
-    return this.fetchJson<GraphDriveItem>(endpoint, options);
+    if (driveId) {
+      const endpoint = `${GRAPH_BASE}/drives/${encodeURIComponent(driveId)}/root:${remotePath}?$select=id,name,parentReference`;
+      return this.fetchJson<GraphDriveItem>(endpoint, options);
+    }
+
+    const myDriveEndpoint = `${GRAPH_BASE}/me/drive/root:${remotePath}?$select=id,name,parentReference`;
+    try {
+      return await this.fetchJson<GraphDriveItem>(myDriveEndpoint, options);
+    } catch (error) {
+      if (!isGraphNotFound(error)) {
+        throw error;
+      }
+    }
+
+    const drives = await this.fetchJson<{ value: GraphDrive[] }>(
+      `${GRAPH_BASE}/me/drives?$select=id,name,driveType`,
+      options
+    );
+
+    for (const drive of drives.value ?? []) {
+      const endpoint = `${GRAPH_BASE}/drives/${encodeURIComponent(drive.id)}/root:${remotePath}?$select=id,name,parentReference`;
+      try {
+        return await this.fetchJson<GraphDriveItem>(endpoint, options);
+      } catch (error) {
+        if (!isGraphNotFound(error)) {
+          throw error;
+        }
+      }
+    }
+
+    throw new Error("itemNotFound: path was not found in /me/drive or any accessible /me/drives entries.");
   }
 
   private async getVersions(driveId: string, itemId: string, options?: RequestOptions): Promise<GraphVersion[]> {
@@ -756,4 +790,9 @@ function samePath(a: string, b: string): boolean {
     return normalizeLocalRoot(a).toLowerCase() === normalizeLocalRoot(b).toLowerCase();
   }
   return normalizeLocalRoot(a) === normalizeLocalRoot(b);
+}
+
+function isGraphNotFound(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.includes("Graph request failed (404)") || message.includes("itemNotFound");
 }
