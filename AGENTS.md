@@ -40,7 +40,12 @@ Keep this repository focused on a reliable VS Code extension that lets users bro
 
 ## Git Workflow
 - Commit small, coherent changes.
+- Commit regularly during active work (not only at the end), with each commit representing one logical unit of progress.
+- Prefer frequent checkpoints for risky or complex edits so rollback and review stay easy.
+- Keep commit messages concise and outcome-focused (imperative mood, clear scope).
 - Use clear commit messages describing functional outcome.
+- Auto-commit policy: once a requested update is completed and validated, create a commit in the same session without waiting for a follow-up prompt.
+- If remote is configured and push is expected for the task, push immediately after the auto-commit.
 - Do not commit secrets, tokens, or local machine paths that are not examples.
 - Keep `.gitignore` aligned with Node + VS Code extension artifacts.
 
