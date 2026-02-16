@@ -107,6 +107,25 @@
           "default": true,
           "description": "Automatically load OneDrive versions when an active editor file is in a OneDrive folder."
         },
+        "onedriveVersions.auth.mode": {
+          "type": "string",
+          "enum": [
+            "vscode",
+            "deviceCode"
+          ],
+          "default": "vscode",
+          "description": "Authentication mode for Microsoft Graph. Use 'deviceCode' when tenant policy blocks VS Code Microsoft auth."
+        },
+        "onedriveVersions.auth.clientId": {
+          "type": "string",
+          "default": "",
+          "description": "Entra app registration client ID for device code auth mode."
+        },
+        "onedriveVersions.auth.tenantId": {
+          "type": "string",
+          "default": "organizations",
+          "description": "Tenant ID or domain for device code auth mode (for example contoso.onmicrosoft.com)."
+        },
         "onedriveVersions.mappings": {
           "type": "array",
           "default": [],
@@ -145,5 +164,8 @@
     "@types/node": "^20.14.9",
     "@types/vscode": "^1.90.0",
     "typescript": "^5.5.4"
+  },
+  "dependencies": {
+    "@azure/msal-node": "^5.0.4"
   }
 }

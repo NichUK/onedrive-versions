@@ -1,4 +1,5 @@
 import * as path from "node:path";
+import { PublicClientApplication } from "@azure/msal-node";
 import * as vscode from "vscode";
 
 const CONTENT_SCHEME = "onedrive-version";
@@ -38,6 +39,10 @@ interface Mapping {
 
 class OneDriveClient {
   private readonly contextCache = new Map<string, VersionContext>();
+  private msalApp?: PublicClientApplication;
+  private msalAccountHomeId?: string;
+  private msalClientId?: string;
+  private msalTenantId?: string;
 
   public async loadVersionsForFile(localPath: string): Promise<VersionContext> {
     const resolved = path.resolve(localPath);
@@ -189,12 +194,83 @@ class OneDriveClient {
   }
 
   private async getAccessToken(): Promise<string> {
-    const scopes = ["Files.Read"];
-    const session = await vscode.authentication.getSession("microsoft", scopes, { createIfNone: true });
-    if (!session) {
-      throw new Error("Microsoft account authentication is required.");
+    const cfg = vscode.workspace.getConfiguration("onedriveVersions");
+    const authMode = cfg.get<string>("auth.mode", "vscode");
+    if (authMode === "deviceCode") {
+      return this.getAccessTokenViaDeviceCode();
     }
-    return session.accessToken;
+
+    const scopes = ["Files.Read"];
+    try {
+      const session = await vscode.authentication.getSession("microsoft", scopes, { createIfNone: true });
+      if (!session) {
+        throw new Error("Microsoft account authentication is required.");
+      }
+      return session.accessToken;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (message.includes("AADSTS65002")) {
+        throw new Error(
+          "Tenant policy blocked VS Code Microsoft auth for Graph. Set onedriveVersions.auth.mode to 'deviceCode' and configure onedriveVersions.auth.clientId with your Entra app registration."
+        );
+      }
+      throw error;
+    }
+  }
+
+  private async getAccessTokenViaDeviceCode(): Promise<string> {
+    const cfg = vscode.workspace.getConfiguration("onedriveVersions");
+    const clientId = cfg.get<string>("auth.clientId", "").trim();
+    const tenantId = cfg.get<string>("auth.tenantId", "organizations").trim() || "organizations";
+    const scopes = ["https://graph.microsoft.com/Files.Read"];
+
+    if (!clientId) {
+      throw new Error(
+        "Device code auth requires onedriveVersions.auth.clientId. Create an Entra app registration (public client) with Microsoft Graph delegated Files.Read."
+      );
+    }
+
+    if (!this.msalApp || this.msalClientId !== clientId || this.msalTenantId !== tenantId) {
+      this.msalApp = new PublicClientApplication({
+        auth: {
+          clientId,
+          authority: `https://login.microsoftonline.com/${tenantId}`
+        }
+      });
+      this.msalClientId = clientId;
+      this.msalTenantId = tenantId;
+      this.msalAccountHomeId = undefined;
+    }
+
+    if (this.msalAccountHomeId) {
+      const accounts = await this.msalApp.getTokenCache().getAllAccounts();
+      const account = accounts.find((a) => a.homeAccountId === this.msalAccountHomeId);
+      if (account) {
+        try {
+          const silent = await this.msalApp.acquireTokenSilent({ account, scopes });
+          if (silent?.accessToken) {
+            return silent.accessToken;
+          }
+        } catch {
+          // Fall back to device code.
+        }
+      }
+    }
+
+    const interactive = await this.msalApp.acquireTokenByDeviceCode({
+      scopes,
+      deviceCodeCallback: (response) => {
+        void vscode.window.showInformationMessage(response.message);
+      }
+    });
+
+    if (!interactive?.accessToken) {
+      throw new Error("Device code sign-in did not return a Graph access token.");
+    }
+    if (interactive.account?.homeAccountId) {
+      this.msalAccountHomeId = interactive.account.homeAccountId;
+    }
+    return interactive.accessToken;
   }
 
   private async fetchJson<T>(url: string): Promise<T> {

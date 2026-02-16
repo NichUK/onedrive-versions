@@ -22,6 +22,8 @@
   - Fallback path inference from local folder segment names matching `OneDrive` / `OneDrive - <Org>`
 - Graph auth uses VS Code Microsoft auth provider with scopes:
   - `Files.Read`
+- Additional auth mode available:
+  - Device code via MSAL (`onedriveVersions.auth.mode = deviceCode`) using user-provided Entra app `clientId`
 - Content preview provider:
   - Scheme: `onedrive-version`
   - Decodes fetched bytes as UTF-8 text
@@ -43,6 +45,7 @@
 - No automated tests yet.
 - Binary version preview is text fallback only (not binary-aware diff/view).
 - Restore currently writes local file bytes; cloud “restore” is achieved via sync upload rather than a dedicated Graph restore endpoint action.
+- Tenant policy may block VS Code first-party Graph auth (`AADSTS65002`); use device-code auth mode in that case.
 
 ## Resume Checklist
 1. Run `npm run compile` to verify baseline.

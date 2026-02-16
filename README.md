@@ -17,8 +17,20 @@ This extension adds OneDrive version navigation for files opened from OneDrive-s
 
 - VS Code signed in to Microsoft account(s) used for OneDrive.
 - OneDrive-synced files available locally.
-- Consent to Microsoft Graph scopes used by this extension:
+- Microsoft Graph delegated permission used by this extension:
   - `Files.Read`
+
+## Authentication Modes
+
+- `onedriveVersions.auth.mode = "vscode"` (default)
+  - Uses VS Code Microsoft authentication provider.
+- `onedriveVersions.auth.mode = "deviceCode"`
+  - Uses MSAL device-code sign-in with your own Entra app registration.
+  - Required settings:
+    - `onedriveVersions.auth.clientId`
+    - Optional `onedriveVersions.auth.tenantId` (default `organizations`)
+
+If your tenant blocks VS Code first-party auth with `AADSTS65002`, switch to `deviceCode` mode.
 
 ## Settings
 
@@ -40,6 +52,14 @@ Example:
     "remoteRoot": "/Shared/Engineering"
   }
 ]
+```
+
+Device-code auth example:
+
+```json
+"onedriveVersions.auth.mode": "deviceCode",
+"onedriveVersions.auth.clientId": "00000000-0000-0000-0000-000000000000",
+"onedriveVersions.auth.tenantId": "contoso.onmicrosoft.com"
 ```
 
 ## Notes
