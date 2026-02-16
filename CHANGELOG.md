@@ -16,3 +16,4 @@
   - one-click switch to device-code mode on `AADSTS65002`
 - Changed auto-load behavior to silent auth checks (no interactive sign-in prompt until user runs a version/auth command).
 - Set production auth defaults to device-code mode with built-in app client ID for lower-friction onboarding.
+- Improved OneDrive root detection on Windows by reading sync mount points from the OneDrive registry provider keys.

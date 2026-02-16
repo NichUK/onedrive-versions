@@ -1,4 +1,5 @@
 import * as path from "node:path";
+import { execSync } from "node:child_process";
 import { PublicClientApplication } from "@azure/msal-node";
 import * as vscode from "vscode";
 
@@ -47,6 +48,7 @@ class OneDriveClient {
   private msalAccountHomeId?: string;
   private msalClientId?: string;
   private msalTenantId?: string;
+  private readonly windowsRegistryMappings: Mapping[] = this.getMappingsFromWindowsRegistry();
 
   public getAuthMode(): "vscode" | "deviceCode" {
     const cfg = vscode.workspace.getConfiguration("onedriveVersions");
@@ -124,8 +126,10 @@ class OneDriveClient {
   private resolveBestMapping(localPath: string): Mapping | undefined {
     const configured = this.getMappingsFromConfig();
     const envMappings = this.getMappingsFromEnvironment();
+    const registryMappings = this.windowsRegistryMappings;
     const inferred = this.inferMappingFromPath(localPath);
-    const candidates = inferred ? [...configured, ...envMappings, inferred] : [...configured, ...envMappings];
+    const baseCandidates = [...configured, ...envMappings, ...registryMappings];
+    const candidates = inferred ? [...baseCandidates, inferred] : baseCandidates;
 
     const matches = candidates
       .map((m) => ({ m, root: normalizeLocalRoot(m.localRoot) }))
@@ -181,6 +185,34 @@ class OneDriveClient {
       }
     }
     return deduped;
+  }
+
+  private getMappingsFromWindowsRegistry(): Mapping[] {
+    if (process.platform !== "win32") {
+      return [];
+    }
+
+    try {
+      const command = "reg query \"HKCU\\Software\\SyncEngines\\Providers\\OneDrive\" /s /v MountPoint";
+      const output = execSync(command, { stdio: ["ignore", "pipe", "ignore"], encoding: "utf8" });
+      const mappings: Mapping[] = [];
+      const seen = new Set<string>();
+      const lines = output.split(/\r?\n/);
+      for (const line of lines) {
+        const match = line.match(/^\s*MountPoint\s+REG_\w+\s+(.+)\s*$/i);
+        if (!match || !match[1]) {
+          continue;
+        }
+        const localRoot = normalizeLocalRoot(match[1].trim());
+        if (!seen.has(localRoot)) {
+          seen.add(localRoot);
+          mappings.push({ localRoot });
+        }
+      }
+      return mappings;
+    } catch {
+      return [];
+    }
   }
 
   private toRemotePath(mapping: Mapping, localPath: string): string {

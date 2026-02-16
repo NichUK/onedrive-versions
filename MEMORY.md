@@ -21,6 +21,7 @@
 - OneDrive detection sources:
   - User settings mappings: `onedriveVersions.mappings`
   - Environment: `OneDrive`, `OneDriveCommercial`, `OneDriveConsumer`
+  - Windows registry mount points from `HKCU\\Software\\SyncEngines\\Providers\\OneDrive` (`MountPoint`)
   - Fallback path inference from local folder segment names matching `OneDrive` / `OneDrive - <Org>`
 - Graph auth uses VS Code Microsoft auth provider with scopes:
   - `Files.Read`
