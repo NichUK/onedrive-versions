@@ -1,0 +1,150 @@
+{
+  "name": "onedrive-versions",
+  "displayName": "OneDrive Versions",
+  "description": "Browse, preview, save-as, and restore OneDrive file versions directly from VS Code.",
+  "version": "0.0.1",
+  "publisher": "local-dev",
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "main": "./out/extension.js",
+  "activationEvents": [
+    "onStartupFinished",
+    "onCommand:onedriveVersions.pickVersion",
+    "onCommand:onedriveVersions.previousVersion",
+    "onCommand:onedriveVersions.nextVersion",
+    "onCommand:onedriveVersions.saveAsVersion",
+    "onCommand:onedriveVersions.restoreVersion"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "onedriveVersions.pickVersion",
+        "title": "OneDrive: Pick Version"
+      },
+      {
+        "command": "onedriveVersions.previousVersion",
+        "title": "OneDrive: Previous Version"
+      },
+      {
+        "command": "onedriveVersions.nextVersion",
+        "title": "OneDrive: Next Version"
+      },
+      {
+        "command": "onedriveVersions.saveAsVersion",
+        "title": "OneDrive: Save Version As..."
+      },
+      {
+        "command": "onedriveVersions.restoreVersion",
+        "title": "OneDrive: Restore Selected Version"
+      }
+    ],
+    "submenus": [
+      {
+        "id": "onedriveVersions.menu",
+        "label": "OneDrive Versions"
+      }
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "submenu": "onedriveVersions.menu",
+          "when": "oneDriveVersions.active",
+          "group": "navigation@10"
+        }
+      ],
+      "onedriveVersions.menu": [
+        {
+          "command": "onedriveVersions.previousVersion",
+          "when": "oneDriveVersions.hasVersions"
+        },
+        {
+          "command": "onedriveVersions.nextVersion",
+          "when": "oneDriveVersions.hasVersions"
+        },
+        {
+          "command": "onedriveVersions.pickVersion"
+        },
+        {
+          "command": "onedriveVersions.saveAsVersion",
+          "when": "oneDriveVersions.hasVersions"
+        },
+        {
+          "command": "onedriveVersions.restoreVersion",
+          "when": "oneDriveVersions.hasVersions"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "onedriveVersions.pickVersion",
+          "when": "oneDriveVersions.active"
+        },
+        {
+          "command": "onedriveVersions.previousVersion",
+          "when": "oneDriveVersions.hasVersions"
+        },
+        {
+          "command": "onedriveVersions.nextVersion",
+          "when": "oneDriveVersions.hasVersions"
+        },
+        {
+          "command": "onedriveVersions.saveAsVersion",
+          "when": "oneDriveVersions.hasVersions"
+        },
+        {
+          "command": "onedriveVersions.restoreVersion",
+          "when": "oneDriveVersions.hasVersions"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "OneDrive Versions",
+      "properties": {
+        "onedriveVersions.autoLoadVersions": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically load OneDrive versions when an active editor file is in a OneDrive folder."
+        },
+        "onedriveVersions.mappings": {
+          "type": "array",
+          "default": [],
+          "description": "Optional local-to-OneDrive mappings. Useful when your local OneDrive root does not map directly to /me/drive/root or when a specific driveId is required.",
+          "items": {
+            "type": "object",
+            "required": [
+              "localRoot"
+            ],
+            "properties": {
+              "localRoot": {
+                "type": "string",
+                "description": "Absolute local folder path for a OneDrive sync root."
+              },
+              "driveId": {
+                "type": "string",
+                "description": "Optional Microsoft Graph drive ID. If omitted, /me/drive is used."
+              },
+              "remoteRoot": {
+                "type": "string",
+                "default": "/",
+                "description": "Remote root path in the selected drive (for example '/Projects')."
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.9",
+    "@types/vscode": "^1.90.0",
+    "typescript": "^5.5.4"
+  }
+}
