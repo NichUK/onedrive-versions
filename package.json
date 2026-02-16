@@ -79,8 +79,7 @@
       ],
       "commandPalette": [
         {
-          "command": "onedriveVersions.pickVersion",
-          "when": "oneDriveVersions.active"
+          "command": "onedriveVersions.pickVersion"
         },
         {
           "command": "onedriveVersions.previousVersion",
