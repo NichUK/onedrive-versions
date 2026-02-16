@@ -12,7 +12,7 @@
       "outFiles": [
         "${workspaceFolder}/out/**/*.js"
       ],
-      "preLaunchTask": "compile (npm.cmd)"
+      "preLaunchTask": "compile (tsc.cmd)"
     }
   ]
 }

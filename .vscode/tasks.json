@@ -2,12 +2,12 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "compile (npm.cmd)",
-      "type": "shell",
-      "command": "npm.cmd",
+      "label": "compile (tsc.cmd)",
+      "type": "process",
+      "command": "${workspaceFolder}\\node_modules\\.bin\\tsc.cmd",
       "args": [
-        "run",
-        "compile"
+        "-p",
+        "./"
       ],
       "group": "build",
       "problemMatcher": "$tsc",
