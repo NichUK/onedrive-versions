@@ -8,6 +8,8 @@
 ## Current State
 - Extension scaffold is complete and compiles successfully.
 - Commands implemented:
+  - `onedriveVersions.connectAccount`
+  - `onedriveVersions.openSetupGuide`
   - `onedriveVersions.pickVersion`
   - `onedriveVersions.previousVersion`
   - `onedriveVersions.nextVersion`
@@ -24,6 +26,9 @@
   - `Files.Read`
 - Additional auth mode available:
   - Device code via MSAL (`onedriveVersions.auth.mode = deviceCode`) using user-provided Entra app `clientId`
+- Onboarding UX implemented:
+  - First-run prompt when device-code mode has no `clientId`
+  - Actionable auth-error prompts (switch auth mode, open settings, open setup guide)
 - Content preview provider:
   - Scheme: `onedrive-version`
   - Decodes fetched bytes as UTF-8 text

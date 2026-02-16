@@ -44,6 +44,26 @@ class OneDriveClient {
   private msalClientId?: string;
   private msalTenantId?: string;
 
+  public getAuthMode(): "vscode" | "deviceCode" {
+    const cfg = vscode.workspace.getConfiguration("onedriveVersions");
+    return cfg.get<"vscode" | "deviceCode">("auth.mode", "vscode");
+  }
+
+  public hasDeviceCodeClientId(): boolean {
+    const cfg = vscode.workspace.getConfiguration("onedriveVersions");
+    const clientId = cfg.get<string>("auth.clientId", "").trim();
+    return clientId.length > 0;
+  }
+
+  public async connectAccount(): Promise<void> {
+    await this.getAccessToken();
+  }
+
+  public async setAuthMode(mode: "vscode" | "deviceCode"): Promise<void> {
+    const cfg = vscode.workspace.getConfiguration("onedriveVersions");
+    await cfg.update("auth.mode", mode, vscode.ConfigurationTarget.Global);
+  }
+
   public async loadVersionsForFile(localPath: string): Promise<VersionContext> {
     const resolved = path.resolve(localPath);
     const mapping = this.resolveBestMapping(resolved);
@@ -194,8 +214,7 @@ class OneDriveClient {
   }
 
   private async getAccessToken(): Promise<string> {
-    const cfg = vscode.workspace.getConfiguration("onedriveVersions");
-    const authMode = cfg.get<string>("auth.mode", "vscode");
+    const authMode = this.getAuthMode();
     if (authMode === "deviceCode") {
       return this.getAccessTokenViaDeviceCode();
     }
@@ -211,7 +230,7 @@ class OneDriveClient {
       const message = error instanceof Error ? error.message : String(error);
       if (message.includes("AADSTS65002")) {
         throw new Error(
-          "Tenant policy blocked VS Code Microsoft auth for Graph. Set onedriveVersions.auth.mode to 'deviceCode' and configure onedriveVersions.auth.clientId with your Entra app registration."
+          "Tenant policy blocked VS Code Microsoft auth for Graph (AADSTS65002). Use 'OneDrive: Connect Microsoft Account' and switch to device code auth."
         );
       }
       throw error;
@@ -226,7 +245,7 @@ class OneDriveClient {
 
     if (!clientId) {
       throw new Error(
-        "Device code auth requires onedriveVersions.auth.clientId. Create an Entra app registration (public client) with Microsoft Graph delegated Files.Read."
+        "Device code auth requires onedriveVersions.auth.clientId. Run 'OneDrive: Open Setup Guide' to configure your Entra app."
       );
     }
 
@@ -334,8 +353,72 @@ class OneDriveVersionContentProvider implements vscode.TextDocumentContentProvid
 export function activate(context: vscode.ExtensionContext): void {
   const client = new OneDriveClient();
   const contentProvider = new OneDriveVersionContentProvider(client);
+  const onboardingKey = "onedriveVersions.onboardingPromptShown";
 
   context.subscriptions.push(vscode.workspace.registerTextDocumentContentProvider(CONTENT_SCHEME, contentProvider));
+
+  const openSetupGuide = async (): Promise<void> => {
+    const readmeUri = vscode.Uri.joinPath(context.extensionUri, "README.md");
+    const doc = await vscode.workspace.openTextDocument(readmeUri);
+    await vscode.window.showTextDocument(doc, { preview: false });
+  };
+
+  const handleOneDriveError = async (error: unknown): Promise<void> => {
+    const message = error instanceof Error ? error.message : String(error);
+
+    if (message.includes("AADSTS65002")) {
+      const action = await vscode.window.showErrorMessage(
+        "OneDrive Versions: Tenant policy blocked VS Code auth. Switch to device-code auth?",
+        "Switch Auth Mode",
+        "Open Setup Guide"
+      );
+      if (action === "Switch Auth Mode") {
+        await client.setAuthMode("deviceCode");
+        await vscode.commands.executeCommand("onedriveVersions.connectAccount");
+      } else if (action === "Open Setup Guide") {
+        await openSetupGuide();
+      }
+      return;
+    }
+
+    if (message.includes("auth.clientId")) {
+      const action = await vscode.window.showErrorMessage(
+        "OneDrive Versions: Device-code auth is not configured yet.",
+        "Open Settings",
+        "Open Setup Guide"
+      );
+      if (action === "Open Settings") {
+        await vscode.commands.executeCommand("workbench.action.openSettings", "onedriveVersions.auth.clientId");
+      } else if (action === "Open Setup Guide") {
+        await openSetupGuide();
+      }
+      return;
+    }
+
+    void vscode.window.showErrorMessage(`OneDrive Versions: ${message}`);
+  };
+
+  const maybeShowFirstRunPrompt = async (): Promise<void> => {
+    const shown = context.globalState.get<boolean>(onboardingKey, false);
+    if (shown) {
+      return;
+    }
+
+    const authMode = client.getAuthMode();
+    if (authMode === "deviceCode" && !client.hasDeviceCodeClientId()) {
+      const action = await vscode.window.showInformationMessage(
+        "OneDrive Versions needs a Microsoft app client ID for device-code sign in.",
+        "Open Settings",
+        "Open Setup Guide"
+      );
+      if (action === "Open Settings") {
+        await vscode.commands.executeCommand("workbench.action.openSettings", "onedriveVersions.auth.clientId");
+      } else if (action === "Open Setup Guide") {
+        await openSetupGuide();
+      }
+      await context.globalState.update(onboardingKey, true);
+    }
+  };
 
   const updateActiveContext = async (): Promise<void> => {
     const localPath = getActiveFilePath();
@@ -358,7 +441,7 @@ export function activate(context: vscode.ExtensionContext): void {
       } catch (error) {
         const msg = error instanceof Error ? error.message : String(error);
         if (!msg.includes("inside a detected OneDrive root")) {
-          void vscode.window.showWarningMessage(`OneDrive Versions: ${msg}`);
+          await handleOneDriveError(error);
         }
       }
     }
@@ -400,6 +483,32 @@ export function activate(context: vscode.ExtensionContext): void {
   };
 
   context.subscriptions.push(
+    vscode.commands.registerCommand("onedriveVersions.connectAccount", async () => {
+      try {
+        if (client.getAuthMode() === "deviceCode" && !client.hasDeviceCodeClientId()) {
+          const action = await vscode.window.showWarningMessage(
+            "Set onedriveVersions.auth.clientId before connecting with device code.",
+            "Open Settings",
+            "Open Setup Guide"
+          );
+          if (action === "Open Settings") {
+            await vscode.commands.executeCommand("workbench.action.openSettings", "onedriveVersions.auth.clientId");
+          } else if (action === "Open Setup Guide") {
+            await openSetupGuide();
+          }
+          return;
+        }
+
+        await client.connectAccount();
+        void vscode.window.showInformationMessage("OneDrive account connected.");
+        await updateActiveContext();
+      } catch (error) {
+        await handleOneDriveError(error);
+      }
+    }),
+    vscode.commands.registerCommand("onedriveVersions.openSetupGuide", async () => {
+      await openSetupGuide();
+    }),
     vscode.commands.registerCommand("onedriveVersions.pickVersion", async () => {
       const localPath = getActiveFilePath();
       if (!localPath) {
@@ -430,8 +539,7 @@ export function activate(context: vscode.ExtensionContext): void {
           await setSelectedIndex(localPath, selected.index);
         }
       } catch (error) {
-        const msg = error instanceof Error ? error.message : String(error);
-        void vscode.window.showErrorMessage(`OneDrive Versions: ${msg}`);
+        await handleOneDriveError(error);
       }
     }),
     vscode.commands.registerCommand("onedriveVersions.previousVersion", async () => {
@@ -443,8 +551,7 @@ export function activate(context: vscode.ExtensionContext): void {
         const state = client.getCachedContext(localPath) ?? (await ensureVersions(localPath));
         await setSelectedIndex(localPath, state.selectedIndex + 1);
       } catch (error) {
-        const msg = error instanceof Error ? error.message : String(error);
-        void vscode.window.showErrorMessage(`OneDrive Versions: ${msg}`);
+        await handleOneDriveError(error);
       }
     }),
     vscode.commands.registerCommand("onedriveVersions.nextVersion", async () => {
@@ -456,8 +563,7 @@ export function activate(context: vscode.ExtensionContext): void {
         const state = client.getCachedContext(localPath) ?? (await ensureVersions(localPath));
         await setSelectedIndex(localPath, state.selectedIndex - 1);
       } catch (error) {
-        const msg = error instanceof Error ? error.message : String(error);
-        void vscode.window.showErrorMessage(`OneDrive Versions: ${msg}`);
+        await handleOneDriveError(error);
       }
     }),
     vscode.commands.registerCommand("onedriveVersions.saveAsVersion", async () => {
@@ -484,8 +590,7 @@ export function activate(context: vscode.ExtensionContext): void {
         await vscode.workspace.fs.writeFile(targetUri, bytes);
         void vscode.window.showInformationMessage(`Saved version ${selected.id} to ${targetUri.fsPath}`);
       } catch (error) {
-        const msg = error instanceof Error ? error.message : String(error);
-        void vscode.window.showErrorMessage(`OneDrive Versions: ${msg}`);
+        await handleOneDriveError(error);
       }
     }),
     vscode.commands.registerCommand("onedriveVersions.restoreVersion", async () => {
@@ -524,8 +629,7 @@ export function activate(context: vscode.ExtensionContext): void {
         await vscode.window.showTextDocument(reopened, { preview: false });
         void vscode.window.showInformationMessage("OneDrive version restored locally. OneDrive sync will upload it as the current version.");
       } catch (error) {
-        const msg = error instanceof Error ? error.message : String(error);
-        void vscode.window.showErrorMessage(`OneDrive Versions: ${msg}`);
+        await handleOneDriveError(error);
       }
     })
   );
@@ -546,6 +650,7 @@ export function activate(context: vscode.ExtensionContext): void {
     })
   );
 
+  void maybeShowFirstRunPrompt();
   void updateActiveContext();
 }
 

@@ -32,6 +32,14 @@ This extension adds OneDrive version navigation for files opened from OneDrive-s
 
 If your tenant blocks VS Code first-party auth with `AADSTS65002`, switch to `deviceCode` mode.
 
+## First-Run Onboarding
+
+Use command palette:
+- `OneDrive: Connect Microsoft Account`
+- `OneDrive: Open Setup Guide`
+
+If you see tenant auth error `AADSTS65002`, use `Switch Auth Mode` in the error prompt, then complete device-code setup.
+
 ## Settings
 
 - `onedriveVersions.autoLoadVersions` (default: `true`)
@@ -60,6 +68,14 @@ Device-code auth example:
 "onedriveVersions.auth.mode": "deviceCode",
 "onedriveVersions.auth.clientId": "00000000-0000-0000-0000-000000000000",
 "onedriveVersions.auth.tenantId": "contoso.onmicrosoft.com"
+```
+
+Recommended production defaults:
+
+```json
+"onedriveVersions.auth.mode": "deviceCode",
+"onedriveVersions.auth.clientId": "<your-shipped-entra-app-client-id>",
+"onedriveVersions.auth.tenantId": "organizations"
 ```
 
 ## Notes

@@ -13,6 +13,8 @@
   "main": "./out/extension.js",
   "activationEvents": [
     "onStartupFinished",
+    "onCommand:onedriveVersions.connectAccount",
+    "onCommand:onedriveVersions.openSetupGuide",
     "onCommand:onedriveVersions.pickVersion",
     "onCommand:onedriveVersions.previousVersion",
     "onCommand:onedriveVersions.nextVersion",
@@ -21,6 +23,14 @@
   ],
   "contributes": {
     "commands": [
+      {
+        "command": "onedriveVersions.connectAccount",
+        "title": "OneDrive: Connect Microsoft Account"
+      },
+      {
+        "command": "onedriveVersions.openSetupGuide",
+        "title": "OneDrive: Open Setup Guide"
+      },
       {
         "command": "onedriveVersions.pickVersion",
         "title": "OneDrive: Pick Version"
@@ -58,6 +68,12 @@
       ],
       "onedriveVersions.menu": [
         {
+          "command": "onedriveVersions.connectAccount"
+        },
+        {
+          "command": "onedriveVersions.openSetupGuide"
+        },
+        {
           "command": "onedriveVersions.previousVersion",
           "when": "oneDriveVersions.hasVersions"
         },
@@ -67,6 +83,12 @@
         },
         {
           "command": "onedriveVersions.pickVersion"
+        },
+        {
+          "command": "onedriveVersions.connectAccount"
+        },
+        {
+          "command": "onedriveVersions.openSetupGuide"
         },
         {
           "command": "onedriveVersions.saveAsVersion",
