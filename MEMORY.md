@@ -18,6 +18,7 @@
 - Editor title submenu is contributed and conditionally shown based on context keys:
   - `oneDriveVersions.active`
   - `oneDriveVersions.hasVersions`
+- Editor title now uses an always-visible `Pick Version` command button, enabled only when `oneDriveVersions.active` is true.
 - OneDrive detection sources:
   - User settings mappings: `onedriveVersions.mappings`
   - Environment: `OneDrive`, `OneDriveCommercial`, `OneDriveConsumer`

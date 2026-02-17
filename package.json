@@ -33,7 +33,8 @@
       },
       {
         "command": "onedriveVersions.pickVersion",
-        "title": "OneDrive: Pick Version"
+        "title": "OneDrive: Pick Version",
+        "enablement": "oneDriveVersions.active"
       },
       {
         "command": "onedriveVersions.previousVersion",
@@ -52,45 +53,11 @@
         "title": "OneDrive: Restore Selected Version"
       }
     ],
-    "submenus": [
-      {
-        "id": "onedriveVersions.menu",
-        "label": "OneDrive Versions"
-      }
-    ],
     "menus": {
       "editor/title": [
         {
-          "submenu": "onedriveVersions.menu",
-          "when": "oneDriveVersions.active",
+          "command": "onedriveVersions.pickVersion",
           "group": "navigation@10"
-        }
-      ],
-      "onedriveVersions.menu": [
-        {
-          "command": "onedriveVersions.connectAccount"
-        },
-        {
-          "command": "onedriveVersions.openSetupGuide"
-        },
-        {
-          "command": "onedriveVersions.previousVersion",
-          "when": "oneDriveVersions.hasVersions"
-        },
-        {
-          "command": "onedriveVersions.nextVersion",
-          "when": "oneDriveVersions.hasVersions"
-        },
-        {
-          "command": "onedriveVersions.pickVersion"
-        },
-        {
-          "command": "onedriveVersions.saveAsVersion",
-          "when": "oneDriveVersions.hasVersions"
-        },
-        {
-          "command": "onedriveVersions.restoreVersion",
-          "when": "oneDriveVersions.hasVersions"
         }
       ],
       "commandPalette": [

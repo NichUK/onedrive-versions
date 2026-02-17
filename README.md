@@ -5,7 +5,8 @@ This extension adds OneDrive version navigation for files opened from OneDrive-s
 ## What it does
 
 - Detects when the active file is inside a OneDrive folder.
-- Adds an `OneDrive Versions` dropdown to the editor title bar.
+- Adds a `OneDrive: Pick Version` button in the editor title bar.
+- The button is enabled only for OneDrive-backed files (disabled/greyed for non-OneDrive files).
 - Lets you:
   - Step to an older version (`Previous Version`)
   - Step to a newer version (`Next Version`)
