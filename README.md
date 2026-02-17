@@ -90,3 +90,4 @@ For external tenants, first run may still require tenant admin consent to this a
 - On Windows, the extension also reads OneDrive sync mount points from `HKCU\\Software\\SyncEngines\\Providers\\OneDrive`.
 - If a file path is not found in `/me/drive`, the extension falls back to searching your accessible drives (`/me/drives`) for the same relative path.
 - For synced SharePoint/library mounts, it also retries with trimmed leading path segments when resolving the remote item path.
+- For synced library folders, it also uses OneDrive registry URL metadata (`FullRemotePath`/`UrlNamespace`) and Graph `/shares/{encodedUrl}` resolution.

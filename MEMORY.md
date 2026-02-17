@@ -21,12 +21,13 @@
 - OneDrive detection sources:
   - User settings mappings: `onedriveVersions.mappings`
   - Environment: `OneDrive`, `OneDriveCommercial`, `OneDriveConsumer`
-  - Windows registry mount points from `HKCU\\Software\\SyncEngines\\Providers\\OneDrive` (`MountPoint`)
+  - Windows registry metadata from `HKCU\\Software\\SyncEngines\\Providers\\OneDrive` (`MountPoint`, `UrlNamespace`, `FullRemotePath`)
   - Fallback path inference from local folder segment names matching `OneDrive` / `OneDrive - <Org>`
 - Graph item resolution strategy:
   - Try `/me/drive/root:{path}` first
   - On `itemNotFound`, fallback to iterate `/me/drives` and resolve the same path in each drive
   - Also retry with progressively trimmed leading path segments for mount-root mismatches
+  - If still unresolved and registry URL metadata exists, resolve item via Graph `/shares/{encodedUrl}/driveItem`
 - Graph auth uses VS Code Microsoft auth provider with scopes:
   - `Files.Read`
 - Additional auth mode available:

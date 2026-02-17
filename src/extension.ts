@@ -42,6 +42,8 @@ interface Mapping {
   localRoot: string;
   driveId?: string;
   remoteRoot?: string;
+  urlNamespace?: string;
+  fullRemotePath?: string;
 }
 
 interface RequestOptions {
@@ -83,8 +85,26 @@ class OneDriveClient {
       throw new Error("File is not inside a detected OneDrive root.");
     }
 
-    const remotePath = this.toRemotePath(mapping, resolved);
-    const item = await this.getDriveItem(mapping.driveId, remotePath, options);
+    const relativeSegments = this.toRelativeSegments(mapping, resolved);
+    const remotePath = this.toRemotePath(mapping, relativeSegments);
+    let item: GraphDriveItem;
+    try {
+      item = await this.getDriveItem(mapping.driveId, remotePath, options);
+    } catch (error) {
+      if (!isGraphNotFound(error)) {
+        throw error;
+      }
+
+      const shareRoots = [mapping.fullRemotePath, mapping.urlNamespace]
+        .filter((value): value is string => Boolean(value && value.trim().length > 0))
+        .map((value) => normalizeShareBaseUrl(value));
+      if (!shareRoots.length) {
+        throw error;
+      }
+
+      item = await this.getDriveItemFromShareRoots(shareRoots, relativeSegments, options);
+    }
+
     const driveId = item.parentReference?.driveId ?? mapping.driveId;
 
     if (!driveId) {
@@ -199,20 +219,62 @@ class OneDriveClient {
     }
 
     try {
-      const command = "reg query \"HKCU\\Software\\SyncEngines\\Providers\\OneDrive\" /s /v MountPoint";
+      const command = "reg query \"HKCU\\Software\\SyncEngines\\Providers\\OneDrive\" /s";
       const output = execSync(command, { stdio: ["ignore", "pipe", "ignore"], encoding: "utf8" });
-      const mappings: Mapping[] = [];
+      const mappingsByKey = new Map<string, Mapping>();
       const seen = new Set<string>();
+      let currentKey = "";
       const lines = output.split(/\r?\n/);
+
       for (const line of lines) {
-        const match = line.match(/^\s*MountPoint\s+REG_\w+\s+(.+)\s*$/i);
-        if (!match || !match[1]) {
+        const keyMatch = line.match(/^HKEY_CURRENT_USER\\Software\\SyncEngines\\Providers\\OneDrive\\(.+)$/i);
+        if (keyMatch?.[1]) {
+          currentKey = keyMatch[1].trim();
+          if (!mappingsByKey.has(currentKey)) {
+            mappingsByKey.set(currentKey, { localRoot: "" });
+          }
           continue;
         }
-        const localRoot = normalizeLocalRoot(match[1].trim());
+
+        if (!currentKey) {
+          continue;
+        }
+
+        const valueMatch = line.match(/^\s*(MountPoint|UrlNamespace|FullRemotePath)\s+REG_\w+\s*(.*)\s*$/i);
+        if (!valueMatch?.[1]) {
+          continue;
+        }
+
+        const mapping = mappingsByKey.get(currentKey);
+        if (!mapping) {
+          continue;
+        }
+
+        const name = valueMatch[1];
+        const rawValue = (valueMatch[2] ?? "").trim();
+        if (name === "MountPoint") {
+          mapping.localRoot = rawValue;
+        } else if (name === "UrlNamespace") {
+          mapping.urlNamespace = rawValue;
+        } else if (name === "FullRemotePath") {
+          mapping.fullRemotePath = rawValue;
+        }
+      }
+
+      const mappings: Mapping[] = [];
+      for (const mapping of mappingsByKey.values()) {
+        if (!mapping.localRoot || !mapping.localRoot.trim()) {
+          continue;
+        }
+
+        const localRoot = normalizeLocalRoot(mapping.localRoot);
         if (!seen.has(localRoot)) {
           seen.add(localRoot);
-          mappings.push({ localRoot });
+          mappings.push({
+            localRoot,
+            urlNamespace: mapping.urlNamespace?.trim() || undefined,
+            fullRemotePath: mapping.fullRemotePath?.trim() || undefined
+          });
         }
       }
       return mappings;
@@ -221,25 +283,26 @@ class OneDriveClient {
     }
   }
 
-  private toRemotePath(mapping: Mapping, localPath: string): string {
+  private toRelativeSegments(mapping: Mapping, localPath: string): string[] {
     const root = normalizeLocalRoot(mapping.localRoot);
     const relative = path.relative(root, localPath);
     if (relative.startsWith("..") || path.isAbsolute(relative)) {
       throw new Error("File is outside the mapped local OneDrive root.");
     }
 
+    return relative.split(path.sep).filter((segment) => segment.length > 0);
+  }
+
+  private toRemotePath(mapping: Mapping, relativeSegments: string[]): string {
     const remoteRoot = normalizeRemoteRoot(mapping.remoteRoot ?? "/");
-    const relativeSegments = relative
-      .split(path.sep)
-      .filter((segment) => segment.length > 0)
-      .map((segment) => encodeURIComponent(segment));
+    const encodedRelativeSegments = relativeSegments.map((segment) => encodeURIComponent(segment));
 
     const rootSegments = remoteRoot
       .split("/")
       .filter((segment) => segment.length > 0)
       .map((segment) => encodeURIComponent(segment));
 
-    const joined = [...rootSegments, ...relativeSegments].join("/");
+    const joined = [...rootSegments, ...encodedRelativeSegments].join("/");
     return `/${joined}`;
   }
 
@@ -290,6 +353,26 @@ class OneDriveClient {
     }
 
     throw new Error("itemNotFound: path was not found in /me/drive or any accessible /me/drives entries (including trimmed-path fallback).");
+  }
+
+  private async getDriveItemFromShareRoots(
+    shareRoots: string[],
+    relativeSegments: string[],
+    options?: RequestOptions
+  ): Promise<GraphDriveItem> {
+    for (const shareRoot of shareRoots) {
+      const shareUrl = appendPathSegmentsToUrl(shareRoot, relativeSegments);
+      const shareId = toGraphShareId(shareUrl);
+      const endpoint = `${GRAPH_BASE}/shares/${shareId}/driveItem?$select=id,name,parentReference`;
+      try {
+        return await this.fetchJson<GraphDriveItem>(endpoint, options);
+      } catch (error) {
+        if (!isGraphNotFound(error)) {
+          throw error;
+        }
+      }
+    }
+    throw new Error("itemNotFound: file could not be resolved via registry share URL metadata.");
   }
 
   private async getVersions(driveId: string, itemId: string, options?: RequestOptions): Promise<GraphVersion[]> {
@@ -826,4 +909,29 @@ function buildRemotePathCandidates(remotePath: string): string[] {
 
   // De-duplicate while preserving order.
   return [...new Set(candidates)];
+}
+
+function normalizeShareBaseUrl(input: string): string {
+  const trimmed = input.trim();
+  if (!trimmed) {
+    return trimmed;
+  }
+
+  // Some registry entries store malformed protocol like "https:/contoso...".
+  const fixedProtocol = trimmed.replace(/^https:\/(?!\/)/i, "https://").replace(/^http:\/(?!\/)/i, "http://");
+  return fixedProtocol;
+}
+
+function appendPathSegmentsToUrl(baseUrl: string, segments: string[]): string {
+  const url = new URL(baseUrl);
+  const basePath = url.pathname.replace(/\/+$/, "");
+  const extraPath = segments.map((segment) => encodeURIComponent(segment)).join("/");
+  url.pathname = extraPath ? `${basePath}/${extraPath}` : basePath || "/";
+  return url.toString();
+}
+
+function toGraphShareId(webUrl: string): string {
+  const base64 = Buffer.from(webUrl, "utf8").toString("base64");
+  const base64Url = base64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+  return `u!${base64Url}`;
 }
