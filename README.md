@@ -18,7 +18,7 @@ This extension adds OneDrive version navigation for files opened from OneDrive-s
 - VS Code signed in to Microsoft account(s) used for OneDrive.
 - OneDrive-synced files available locally.
 - Microsoft Graph delegated permission used by this extension:
-  - `Files.Read`
+  - `Files.Read.All`
 
 ## Authentication Modes
 
@@ -80,7 +80,7 @@ Recommended production defaults (already shipped in this repo):
 "onedriveVersions.auth.tenantId": "organizations"
 ```
 
-For external tenants, first run may still require tenant admin consent to this app's `Files.Read` permission.
+For external tenants, first run may still require tenant admin consent to this app's `Files.Read.All` permission.
 
 ## Notes
 

@@ -452,7 +452,7 @@ class OneDriveClient {
       return this.getAccessTokenViaDeviceCode({ interactive });
     }
 
-    const scopes = ["Files.Read"];
+    const scopes = ["Files.Read.All"];
     try {
       const session = await vscode.authentication.getSession("microsoft", scopes, { createIfNone: interactive });
       if (!session) {
@@ -475,7 +475,7 @@ class OneDriveClient {
     const cfg = vscode.workspace.getConfiguration("onedriveVersions");
     const clientId = cfg.get<string>("auth.clientId", "").trim();
     const tenantId = cfg.get<string>("auth.tenantId", "organizations").trim() || "organizations";
-    const scopes = ["https://graph.microsoft.com/Files.Read"];
+    const scopes = ["https://graph.microsoft.com/Files.Read.All"];
 
     if (!clientId) {
       throw new Error(

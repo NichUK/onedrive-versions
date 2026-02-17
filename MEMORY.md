@@ -30,7 +30,7 @@
   - If still unresolved and registry URL metadata exists, resolve item via Graph `/shares/{encodedUrl}/driveItem`
   - If `/shares` is blocked (`accessDenied`), fallback to URL-prefix matching against drive `webUrl` and resolve via `/drives/{id}/root:/...`
 - Graph auth uses VS Code Microsoft auth provider with scopes:
-  - `Files.Read`
+  - `Files.Read.All`
 - Additional auth mode available:
   - Device code via MSAL (`onedriveVersions.auth.mode = deviceCode`) using user-provided Entra app `clientId`
   - Device-code flow now auto-opens verification URL and copies user code to clipboard
