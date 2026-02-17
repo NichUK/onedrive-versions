@@ -20,6 +20,7 @@
   - `oneDriveVersions.hasVersions`
 - Editor title now uses an always-visible `Pick Version` command button, enabled only when `oneDriveVersions.active` is true.
 - Active-file resolution now treats `onedrive-version:` preview documents as their source local file so version controls remain enabled while browsing previews.
+- Version content retrieval now falls back to `/items/{id}/content` when Graph rejects `/versions/{id}/content` for current-version IDs.
 - OneDrive detection sources:
   - User settings mappings: `onedriveVersions.mappings`
   - Environment: `OneDrive`, `OneDriveCommercial`, `OneDriveConsumer`

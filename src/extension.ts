@@ -155,8 +155,16 @@ class OneDriveClient {
 
   public async downloadVersionBytes(localPath: string, versionId: string): Promise<Uint8Array> {
     const context = this.getCachedContext(localPath) ?? (await this.loadVersionsForFile(localPath));
-    const endpoint = `${GRAPH_BASE}/drives/${encodeURIComponent(context.driveId)}/items/${encodeURIComponent(context.itemId)}/versions/${encodeURIComponent(versionId)}/content`;
-    return this.fetchBinary(endpoint);
+    const versionEndpoint = `${GRAPH_BASE}/drives/${encodeURIComponent(context.driveId)}/items/${encodeURIComponent(context.itemId)}/versions/${encodeURIComponent(versionId)}/content`;
+    try {
+      return await this.fetchBinary(versionEndpoint);
+    } catch (error) {
+      if (!isGraphCurrentVersionContentUnsupported(error)) {
+        throw error;
+      }
+      const currentEndpoint = `${GRAPH_BASE}/drives/${encodeURIComponent(context.driveId)}/items/${encodeURIComponent(context.itemId)}/content`;
+      return this.fetchBinary(currentEndpoint);
+    }
   }
 
   public findOneDriveRoot(localPath: string): Mapping | undefined {
@@ -971,6 +979,13 @@ function isGraphNotFound(error: unknown): boolean {
 function isGraphAccessDenied(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
   return message.includes("Graph request failed (403)") || message.includes("accessDenied");
+}
+
+function isGraphCurrentVersionContentUnsupported(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.includes("Graph content request failed (400)")
+    && message.includes("invalidRequest")
+    && message.includes("current version");
 }
 
 function buildRemotePathCandidates(remotePath: string): string[] {
