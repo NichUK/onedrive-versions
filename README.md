@@ -89,3 +89,4 @@ For external tenants, first run may still require tenant admin consent to this a
 - If OneDrive environment variables are unavailable, the extension also tries to infer a local OneDrive root from folder names like `OneDrive` or `OneDrive - <Org>`.
 - On Windows, the extension also reads OneDrive sync mount points from `HKCU\\Software\\SyncEngines\\Providers\\OneDrive`.
 - If a file path is not found in `/me/drive`, the extension falls back to searching your accessible drives (`/me/drives`) for the same relative path.
+- For synced SharePoint/library mounts, it also retries with trimmed leading path segments when resolving the remote item path.

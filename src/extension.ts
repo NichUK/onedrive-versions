@@ -244,17 +244,30 @@ class OneDriveClient {
   }
 
   private async getDriveItem(driveId: string | undefined, remotePath: string, options?: RequestOptions): Promise<GraphDriveItem> {
+    const remotePathCandidates = buildRemotePathCandidates(remotePath);
+
     if (driveId) {
-      const endpoint = `${GRAPH_BASE}/drives/${encodeURIComponent(driveId)}/root:${remotePath}?$select=id,name,parentReference`;
-      return this.fetchJson<GraphDriveItem>(endpoint, options);
+      for (const candidatePath of remotePathCandidates) {
+        const endpoint = `${GRAPH_BASE}/drives/${encodeURIComponent(driveId)}/root:${candidatePath}?$select=id,name,parentReference`;
+        try {
+          return await this.fetchJson<GraphDriveItem>(endpoint, options);
+        } catch (error) {
+          if (!isGraphNotFound(error)) {
+            throw error;
+          }
+        }
+      }
+      throw new Error("itemNotFound: path was not found in configured drive mapping.");
     }
 
-    const myDriveEndpoint = `${GRAPH_BASE}/me/drive/root:${remotePath}?$select=id,name,parentReference`;
-    try {
-      return await this.fetchJson<GraphDriveItem>(myDriveEndpoint, options);
-    } catch (error) {
-      if (!isGraphNotFound(error)) {
-        throw error;
+    for (const candidatePath of remotePathCandidates) {
+      const myDriveEndpoint = `${GRAPH_BASE}/me/drive/root:${candidatePath}?$select=id,name,parentReference`;
+      try {
+        return await this.fetchJson<GraphDriveItem>(myDriveEndpoint, options);
+      } catch (error) {
+        if (!isGraphNotFound(error)) {
+          throw error;
+        }
       }
     }
 
@@ -264,17 +277,19 @@ class OneDriveClient {
     );
 
     for (const drive of drives.value ?? []) {
-      const endpoint = `${GRAPH_BASE}/drives/${encodeURIComponent(drive.id)}/root:${remotePath}?$select=id,name,parentReference`;
-      try {
-        return await this.fetchJson<GraphDriveItem>(endpoint, options);
-      } catch (error) {
-        if (!isGraphNotFound(error)) {
-          throw error;
+      for (const candidatePath of remotePathCandidates) {
+        const endpoint = `${GRAPH_BASE}/drives/${encodeURIComponent(drive.id)}/root:${candidatePath}?$select=id,name,parentReference`;
+        try {
+          return await this.fetchJson<GraphDriveItem>(endpoint, options);
+        } catch (error) {
+          if (!isGraphNotFound(error)) {
+            throw error;
+          }
         }
       }
     }
 
-    throw new Error("itemNotFound: path was not found in /me/drive or any accessible /me/drives entries.");
+    throw new Error("itemNotFound: path was not found in /me/drive or any accessible /me/drives entries (including trimmed-path fallback).");
   }
 
   private async getVersions(driveId: string, itemId: string, options?: RequestOptions): Promise<GraphVersion[]> {
@@ -795,4 +810,20 @@ function samePath(a: string, b: string): boolean {
 function isGraphNotFound(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
   return message.includes("Graph request failed (404)") || message.includes("itemNotFound");
+}
+
+function buildRemotePathCandidates(remotePath: string): string[] {
+  const normalized = remotePath.startsWith("/") ? remotePath : `/${remotePath}`;
+  const segments = normalized.split("/").filter((s) => s.length > 0);
+  if (!segments.length) {
+    return ["/"];
+  }
+
+  const candidates: string[] = [];
+  for (let start = 0; start < segments.length; start++) {
+    candidates.push(`/${segments.slice(start).join("/")}`);
+  }
+
+  // De-duplicate while preserving order.
+  return [...new Set(candidates)];
 }

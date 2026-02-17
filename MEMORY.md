@@ -26,6 +26,7 @@
 - Graph item resolution strategy:
   - Try `/me/drive/root:{path}` first
   - On `itemNotFound`, fallback to iterate `/me/drives` and resolve the same path in each drive
+  - Also retry with progressively trimmed leading path segments for mount-root mismatches
 - Graph auth uses VS Code Microsoft auth provider with scopes:
   - `Files.Read`
 - Additional auth mode available:

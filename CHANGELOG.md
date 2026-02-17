@@ -19,3 +19,4 @@
 - Improved OneDrive root detection on Windows by reading sync mount points from the OneDrive registry provider keys.
 - Device-code auth now auto-opens the verification URL and copies the device code to clipboard.
 - Added fallback drive resolution: if `/me/drive` path lookup returns `itemNotFound`, try matching path across `/me/drives`.
+- Added trimmed-path fallback when resolving drive items to better support SharePoint-synced mount roots.
