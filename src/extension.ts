@@ -919,10 +919,19 @@ function getActiveFilePath(): string | undefined {
   if (!editor) {
     return undefined;
   }
-  if (editor.document.uri.scheme !== "file") {
-    return undefined;
+  const uri = editor.document.uri;
+  if (uri.scheme === "file") {
+    return uri.fsPath;
   }
-  return editor.document.uri.fsPath;
+  if (uri.scheme === CONTENT_SCHEME) {
+    const query = uri.query ?? "";
+    const match = query.match(/(?:^|&)local=([^&]+)/);
+    if (!match?.[1]) {
+      return undefined;
+    }
+    return decodeURIComponent(match[1]);
+  }
+  return undefined;
 }
 
 function normalizeLocalRoot(input: string): string {
