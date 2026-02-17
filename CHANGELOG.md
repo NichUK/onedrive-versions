@@ -21,3 +21,4 @@
 - Added fallback drive resolution: if `/me/drive` path lookup returns `itemNotFound`, try matching path across `/me/drives`.
 - Added trimmed-path fallback when resolving drive items to better support SharePoint-synced mount roots.
 - Added registry URL metadata fallback (`FullRemotePath`/`UrlNamespace`) using Graph `/shares/{encodedUrl}` for synced SharePoint library mounts.
+- Added fallback that maps registry URL metadata to drive `webUrl` and resolves items through `/drives/{id}/root:/...` when `/shares` returns access denied.

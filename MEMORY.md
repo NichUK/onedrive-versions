@@ -28,6 +28,7 @@
   - On `itemNotFound`, fallback to iterate `/me/drives` and resolve the same path in each drive
   - Also retry with progressively trimmed leading path segments for mount-root mismatches
   - If still unresolved and registry URL metadata exists, resolve item via Graph `/shares/{encodedUrl}/driveItem`
+  - If `/shares` is blocked (`accessDenied`), fallback to URL-prefix matching against drive `webUrl` and resolve via `/drives/{id}/root:/...`
 - Graph auth uses VS Code Microsoft auth provider with scopes:
   - `Files.Read`
 - Additional auth mode available:

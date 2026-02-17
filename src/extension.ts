@@ -29,6 +29,7 @@ interface GraphDrive {
   id: string;
   name?: string;
   driveType?: string;
+  webUrl?: string;
 }
 
 interface VersionContext {
@@ -87,22 +88,35 @@ class OneDriveClient {
 
     const relativeSegments = this.toRelativeSegments(mapping, resolved);
     const remotePath = this.toRemotePath(mapping, relativeSegments);
-    let item: GraphDriveItem;
+    let item: GraphDriveItem | undefined;
     try {
-      item = await this.getDriveItem(mapping.driveId, remotePath, options);
+      item = await this.getDriveItem(mapping, remotePath, options);
     } catch (error) {
-      if (!isGraphNotFound(error)) {
+      if (!isGraphNotFound(error) && !isGraphAccessDenied(error)) {
         throw error;
       }
 
-      const shareRoots = [mapping.fullRemotePath, mapping.urlNamespace]
-        .filter((value): value is string => Boolean(value && value.trim().length > 0))
-        .map((value) => normalizeShareBaseUrl(value));
-      if (!shareRoots.length) {
-        throw error;
+      try {
+        item = await this.getDriveItemByDriveWebUrl(mapping, relativeSegments, options);
+      } catch (driveUrlError) {
+        if (!isGraphNotFound(driveUrlError) && !isGraphAccessDenied(driveUrlError)) {
+          throw driveUrlError;
+        }
       }
 
-      item = await this.getDriveItemFromShareRoots(shareRoots, relativeSegments, options);
+      if (!item) {
+        const shareRoots = [mapping.fullRemotePath, mapping.urlNamespace]
+          .filter((value): value is string => Boolean(value && value.trim().length > 0))
+          .map((value) => normalizeShareBaseUrl(value));
+        if (!shareRoots.length) {
+          throw error;
+        }
+        item = await this.getDriveItemFromShareRoots(shareRoots, relativeSegments, options);
+      }
+    }
+
+    if (!item) {
+      throw new Error("itemNotFound: unable to resolve remote item for local OneDrive path.");
     }
 
     const driveId = item.parentReference?.driveId ?? mapping.driveId;
@@ -306,8 +320,9 @@ class OneDriveClient {
     return `/${joined}`;
   }
 
-  private async getDriveItem(driveId: string | undefined, remotePath: string, options?: RequestOptions): Promise<GraphDriveItem> {
+  private async getDriveItem(mapping: Mapping, remotePath: string, options?: RequestOptions): Promise<GraphDriveItem> {
     const remotePathCandidates = buildRemotePathCandidates(remotePath);
+    const driveId = mapping.driveId;
 
     if (driveId) {
       for (const candidatePath of remotePathCandidates) {
@@ -353,6 +368,55 @@ class OneDriveClient {
     }
 
     throw new Error("itemNotFound: path was not found in /me/drive or any accessible /me/drives entries (including trimmed-path fallback).");
+  }
+
+  private async getDriveItemByDriveWebUrl(
+    mapping: Mapping,
+    relativeSegments: string[],
+    options?: RequestOptions
+  ): Promise<GraphDriveItem> {
+    const shareRoots = [mapping.fullRemotePath, mapping.urlNamespace]
+      .filter((value): value is string => Boolean(value && value.trim().length > 0))
+      .map((value) => normalizeShareBaseUrl(value));
+
+    if (!shareRoots.length) {
+      throw new Error("itemNotFound: no registry URL metadata available.");
+    }
+
+    const targetUrls = shareRoots.map((root) => appendPathSegmentsToUrl(root, relativeSegments));
+    const drives = await this.fetchJson<{ value: GraphDrive[] }>(
+      `${GRAPH_BASE}/me/drives?$select=id,name,driveType,webUrl`,
+      options
+    );
+
+    for (const drive of drives.value ?? []) {
+      const driveWebUrl = drive.webUrl ? normalizeShareBaseUrl(drive.webUrl) : "";
+      if (!driveWebUrl) {
+        continue;
+      }
+      for (const targetUrl of targetUrls) {
+        const relative = getRelativePathByUrlPrefix(targetUrl, driveWebUrl);
+        if (relative === undefined) {
+          continue;
+        }
+        const encodedRelative = relative
+          .split("/")
+          .filter((s) => s.length > 0)
+          .map((s) => encodeURIComponent(s))
+          .join("/");
+        const candidatePath = encodedRelative ? `/${encodedRelative}` : "/";
+        const endpoint = `${GRAPH_BASE}/drives/${encodeURIComponent(drive.id)}/root:${candidatePath}?$select=id,name,parentReference`;
+        try {
+          return await this.fetchJson<GraphDriveItem>(endpoint, options);
+        } catch (error) {
+          if (!isGraphNotFound(error) && !isGraphAccessDenied(error)) {
+            throw error;
+          }
+        }
+      }
+    }
+
+    throw new Error("itemNotFound: registry URL fallback could not map file to an accessible drive webUrl.");
   }
 
   private async getDriveItemFromShareRoots(
@@ -895,6 +959,11 @@ function isGraphNotFound(error: unknown): boolean {
   return message.includes("Graph request failed (404)") || message.includes("itemNotFound");
 }
 
+function isGraphAccessDenied(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.includes("Graph request failed (403)") || message.includes("accessDenied");
+}
+
 function buildRemotePathCandidates(remotePath: string): string[] {
   const normalized = remotePath.startsWith("/") ? remotePath : `/${remotePath}`;
   const segments = normalized.split("/").filter((s) => s.length > 0);
@@ -934,4 +1003,26 @@ function toGraphShareId(webUrl: string): string {
   const base64 = Buffer.from(webUrl, "utf8").toString("base64");
   const base64Url = base64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
   return `u!${base64Url}`;
+}
+
+function getRelativePathByUrlPrefix(targetUrl: string, baseUrl: string): string | undefined {
+  try {
+    const target = new URL(targetUrl);
+    const base = new URL(baseUrl);
+
+    if (target.origin.toLowerCase() !== base.origin.toLowerCase()) {
+      return undefined;
+    }
+
+    const targetPath = target.pathname.replace(/\/+$/, "");
+    const basePath = base.pathname.replace(/\/+$/, "");
+    if (!targetPath.toLowerCase().startsWith(basePath.toLowerCase())) {
+      return undefined;
+    }
+
+    const remaining = targetPath.slice(basePath.length).replace(/^\/+/, "");
+    return decodeURIComponent(remaining);
+  } catch {
+    return undefined;
+  }
 }
