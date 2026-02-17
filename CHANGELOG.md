@@ -26,3 +26,6 @@
 - Switched editor-top UI to an always-visible `Pick Version` button with enable/disable state based on background OneDrive-file detection.
 - Fixed picker-state regression where opening a version preview disabled the top button; preview tabs now map back to the source local file context.
 - Added content-download fallback for Graph `invalidRequest` on current version IDs (uses `/items/{id}/content` when `/versions/{id}/content` is rejected).
+- Version preview now opens as diff view against the current local file.
+- Added OneDrive selected-version status badge.
+- Added automated unit tests for resolver utility logic (`npm test`).

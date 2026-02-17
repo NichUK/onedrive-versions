@@ -2,6 +2,16 @@ import * as path from "node:path";
 import { execSync } from "node:child_process";
 import { PublicClientApplication } from "@azure/msal-node";
 import * as vscode from "vscode";
+import {
+  appendPathSegmentsToUrl,
+  buildRemotePathCandidates,
+  getRelativePathByUrlPrefix,
+  isGraphAccessDenied,
+  isGraphCurrentVersionContentUnsupported,
+  isGraphNotFound,
+  normalizeShareBaseUrl,
+  toGraphShareId
+} from "./resolver-utils";
 
 const CONTENT_SCHEME = "onedrive-version";
 const GRAPH_BASE = "https://graph.microsoft.com/v1.0";
@@ -614,6 +624,10 @@ export function activate(context: vscode.ExtensionContext): void {
   const client = new OneDriveClient();
   const contentProvider = new OneDriveVersionContentProvider(client);
   const onboardingKey = "onedriveVersions.onboardingPromptShown";
+  const versionBadge = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
+  versionBadge.command = "onedriveVersions.pickVersion";
+  versionBadge.name = "OneDrive Version";
+  context.subscriptions.push(versionBadge);
 
   context.subscriptions.push(vscode.workspace.registerTextDocumentContentProvider(CONTENT_SCHEME, contentProvider));
 
@@ -711,6 +725,32 @@ export function activate(context: vscode.ExtensionContext): void {
     }
   };
 
+  const updateVersionBadge = (): void => {
+    const localPath = getActiveFilePath();
+    if (!localPath) {
+      versionBadge.hide();
+      return;
+    }
+
+    const state = client.getCachedContext(localPath);
+    if (!state || !state.versions.length) {
+      versionBadge.hide();
+      return;
+    }
+
+    const selected = state.versions[state.selectedIndex];
+    if (!selected) {
+      versionBadge.hide();
+      return;
+    }
+
+    const dateLabel = new Date(selected.lastModifiedDateTime).toLocaleString();
+    const author = selected.lastModifiedBy?.user?.displayName ?? "unknown";
+    versionBadge.text = `$(history) OneDrive: ${dateLabel}`;
+    versionBadge.tooltip = `Selected version ${selected.id} by ${author}`;
+    versionBadge.show();
+  };
+
   const openSelectedVersionPreview = async (localPath: string): Promise<void> => {
     const data = client.getCachedContext(localPath) ?? (await client.loadVersionsForFile(localPath));
     const version = data.versions[data.selectedIndex];
@@ -726,13 +766,17 @@ export function activate(context: vscode.ExtensionContext): void {
       fragment: `version=${encodeURIComponent(version.id)}`
     });
 
-    const doc = await vscode.workspace.openTextDocument(uri);
-    await vscode.window.showTextDocument(doc, { preview: true, preserveFocus: false });
+    const currentUri = vscode.Uri.file(localPath);
+    const dateLabel = new Date(version.lastModifiedDateTime).toLocaleString();
+    const title = `${fileName} (OneDrive ${dateLabel}) ↔ Current`;
+    await vscode.commands.executeCommand("vscode.diff", uri, currentUri, title, { preview: true });
+    updateVersionBadge();
   };
 
   const ensureVersions = async (localPath: string): Promise<VersionContext> => {
     const loaded = await client.loadVersionsForFile(localPath);
     await vscode.commands.executeCommand("setContext", "oneDriveVersions.hasVersions", loaded.versions.length > 0);
+    updateVersionBadge();
     return loaded;
   };
 
@@ -744,6 +788,7 @@ export function activate(context: vscode.ExtensionContext): void {
     const clamped = Math.max(0, Math.min(state.versions.length - 1, nextIndex));
     state.selectedIndex = clamped;
     await openSelectedVersionPreview(localPath);
+    updateVersionBadge();
   };
 
   context.subscriptions.push(
@@ -766,6 +811,7 @@ export function activate(context: vscode.ExtensionContext): void {
         await client.connectAccount();
         void vscode.window.showInformationMessage("OneDrive account connected.");
         await updateActiveContext();
+        updateVersionBadge();
       } catch (error) {
         await handleOneDriveError(error);
       }
@@ -892,6 +938,7 @@ export function activate(context: vscode.ExtensionContext): void {
         const reopened = await vscode.workspace.openTextDocument(vscode.Uri.file(localPath));
         await vscode.window.showTextDocument(reopened, { preview: false });
         void vscode.window.showInformationMessage("OneDrive version restored locally. OneDrive sync will upload it as the current version.");
+        updateVersionBadge();
       } catch (error) {
         await handleOneDriveError(error);
       }
@@ -901,6 +948,7 @@ export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
     vscode.window.onDidChangeActiveTextEditor(() => {
       void updateActiveContext();
+      updateVersionBadge();
     }),
     vscode.workspace.onDidCloseTextDocument((document) => {
       if (document.uri.scheme === "file") {
@@ -910,12 +958,14 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.workspace.onDidChangeConfiguration((event) => {
       if (event.affectsConfiguration("onedriveVersions")) {
         void updateActiveContext();
+        updateVersionBadge();
       }
     })
   );
 
   void maybeShowFirstRunPrompt();
   void updateActiveContext();
+  updateVersionBadge();
 }
 
 export function deactivate(): void {
@@ -969,84 +1019,4 @@ function samePath(a: string, b: string): boolean {
     return normalizeLocalRoot(a).toLowerCase() === normalizeLocalRoot(b).toLowerCase();
   }
   return normalizeLocalRoot(a) === normalizeLocalRoot(b);
-}
-
-function isGraphNotFound(error: unknown): boolean {
-  const message = error instanceof Error ? error.message : String(error);
-  return message.includes("Graph request failed (404)") || message.includes("itemNotFound");
-}
-
-function isGraphAccessDenied(error: unknown): boolean {
-  const message = error instanceof Error ? error.message : String(error);
-  return message.includes("Graph request failed (403)") || message.includes("accessDenied");
-}
-
-function isGraphCurrentVersionContentUnsupported(error: unknown): boolean {
-  const message = error instanceof Error ? error.message : String(error);
-  return message.includes("Graph content request failed (400)")
-    && message.includes("invalidRequest")
-    && message.includes("current version");
-}
-
-function buildRemotePathCandidates(remotePath: string): string[] {
-  const normalized = remotePath.startsWith("/") ? remotePath : `/${remotePath}`;
-  const segments = normalized.split("/").filter((s) => s.length > 0);
-  if (!segments.length) {
-    return ["/"];
-  }
-
-  const candidates: string[] = [];
-  for (let start = 0; start < segments.length; start++) {
-    candidates.push(`/${segments.slice(start).join("/")}`);
-  }
-
-  // De-duplicate while preserving order.
-  return [...new Set(candidates)];
-}
-
-function normalizeShareBaseUrl(input: string): string {
-  const trimmed = input.trim();
-  if (!trimmed) {
-    return trimmed;
-  }
-
-  // Some registry entries store malformed protocol like "https:/contoso...".
-  const fixedProtocol = trimmed.replace(/^https:\/(?!\/)/i, "https://").replace(/^http:\/(?!\/)/i, "http://");
-  return fixedProtocol;
-}
-
-function appendPathSegmentsToUrl(baseUrl: string, segments: string[]): string {
-  const url = new URL(baseUrl);
-  const basePath = url.pathname.replace(/\/+$/, "");
-  const extraPath = segments.map((segment) => encodeURIComponent(segment)).join("/");
-  url.pathname = extraPath ? `${basePath}/${extraPath}` : basePath || "/";
-  return url.toString();
-}
-
-function toGraphShareId(webUrl: string): string {
-  const base64 = Buffer.from(webUrl, "utf8").toString("base64");
-  const base64Url = base64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
-  return `u!${base64Url}`;
-}
-
-function getRelativePathByUrlPrefix(targetUrl: string, baseUrl: string): string | undefined {
-  try {
-    const target = new URL(targetUrl);
-    const base = new URL(baseUrl);
-
-    if (target.origin.toLowerCase() !== base.origin.toLowerCase()) {
-      return undefined;
-    }
-
-    const targetPath = target.pathname.replace(/\/+$/, "");
-    const basePath = base.pathname.replace(/\/+$/, "");
-    if (!targetPath.toLowerCase().startsWith(basePath.toLowerCase())) {
-      return undefined;
-    }
-
-    const remaining = targetPath.slice(basePath.length).replace(/^\/+/, "");
-    return decodeURIComponent(remaining);
-  } catch {
-    return undefined;
-  }
 }

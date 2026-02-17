@@ -7,6 +7,8 @@ This extension adds OneDrive version navigation for files opened from OneDrive-s
 - Detects when the active file is inside a OneDrive folder.
 - Adds a `OneDrive: Pick Version` button in the editor title bar.
 - The button is enabled only for OneDrive-backed files (disabled/greyed for non-OneDrive files).
+- Opens selected versions in a side-by-side diff against the current local file.
+- Shows a live OneDrive selected-version badge in the status bar.
 - Lets you:
   - Step to an older version (`Previous Version`)
   - Step to a newer version (`Next Version`)
@@ -93,3 +95,8 @@ For external tenants, first run may still require tenant admin consent to this a
 - For synced SharePoint/library mounts, it also retries with trimmed leading path segments when resolving the remote item path.
 - For synced library folders, it also uses OneDrive registry URL metadata (`FullRemotePath`/`UrlNamespace`) and Graph `/shares/{encodedUrl}` resolution.
 - If `/shares` resolution is blocked by tenant policy, it additionally matches registry URL metadata against accessible drive `webUrl` values and resolves via `/drives/{id}/root:/...`.
+
+## Development
+
+- Compile: `npm run compile`
+- Test: `npm test`

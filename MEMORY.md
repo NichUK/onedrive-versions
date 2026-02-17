@@ -21,6 +21,8 @@
 - Editor title now uses an always-visible `Pick Version` command button, enabled only when `oneDriveVersions.active` is true.
 - Active-file resolution now treats `onedrive-version:` preview documents as their source local file so version controls remain enabled while browsing previews.
 - Version content retrieval now falls back to `/items/{id}/content` when Graph rejects `/versions/{id}/content` for current-version IDs.
+- Version previews now open in diff mode (`onedrive-version` vs current local file).
+- Status bar badge shows selected OneDrive version timestamp and remains clickable to re-open picker.
 - OneDrive detection sources:
   - User settings mappings: `onedriveVersions.mappings`
   - Environment: `OneDrive`, `OneDriveCommercial`, `OneDriveConsumer`
@@ -67,6 +69,7 @@
 - Binary version preview is text fallback only (not binary-aware diff/view).
 - Restore currently writes local file bytes; cloud “restore” is achieved via sync upload rather than a dedicated Graph restore endpoint action.
 - Tenant policy may block VS Code first-party Graph auth (`AADSTS65002`); use device-code auth mode in that case.
+- Unit tests added for resolver helpers under `src/test`.
 
 ## Resume Checklist
 1. Run `npm run compile` to verify baseline.
